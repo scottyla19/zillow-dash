@@ -8,6 +8,8 @@ import pandas as pd
 
 
 app = dash.Dash()
+#df= pd.read_csv('http://files.zillowstatic.com/research/public/Zip/Zip_MedianValuePerSqft_AllHomes.csv')
+
 df= pd.read_csv('Zip_MedianValuePerSqft_AllHomes.csv')
 
 states = df.State.unique()
