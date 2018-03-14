@@ -22,25 +22,36 @@ app.layout = html.Div(children=[
     dcc.Dropdown(
         id='state-choice',
         options=[{'label': i, 'value': i} for i in states],
-        placeholder='Choose your state'
+        placeholder='Choose your state',
+        multi=True
     ),
     dcc.Dropdown(
         id='metro-choice',
-        # options=[{'label': i, 'value': i} for i in states],
-        placeholder='Choose your metro area'
+        placeholder='Choose your metro area',
+        multi=True
     ),
     dcc.Dropdown(
         id='zip-choice',
-        # options=[{'label': i, 'value': i} for i in states],
-        placeholder='Choose your zipcode'
+        placeholder='Choose your zipcode',
+        multi=True
     ),
-    dt.DataTable(
-        rows=[{}],
-        id='datatable',
-        # rows=df.to_dict('records'),
-        filterable=True,
-        sortable=True
+    dcc.Checklist(
+        id='showTable',
+        options=[
+            {'label': 'Show Table', 'value': 'Show'},
+        ],
+        values=['Show']
     ),
+    html.Div(id='dt-container', children=[
+        dt.DataTable(
+            rows=[{}],
+            id='datatable',
+            filterable=True,
+            sortable=True
+        )
+    ]),
+
+
     dcc.Graph(id='graph')
 ])
 
@@ -52,21 +63,21 @@ app.layout = html.Div(children=[
     Input('zip-choice', 'value')])
 def state_cb(state, metro, zipcode):
     if zipcode:
-        currDF = df[df['RegionName']== zipcode]
+        currDF = df[(df['State'].isin(state)) & (df['Metro'].isin(metro)) & (df['RegionName'].isin(zipcode))]
         return currDF.to_dict('records')
     elif metro:
-        currDF = df[df['Metro']== metro]
+        currDF = df[(df['State'].isin(state)) & (df['Metro'].isin(metro))]
         return currDF.to_dict('records')
     else:
-        currDF = df[df['State']== state]
+        currDF = df[df['State'].isin(state)]
         return currDF.to_dict('records')
 
 # update metro dropdown on state dropdown choice
 @app.callback(
     Output('metro-choice', 'options'),
     [dash.dependencies.Input('state-choice', 'value')])
-def metro_cb(dropdown_value):
-    currDF = df[df['State'] == dropdown_value]
+def metro_cb(state):
+    currDF = df[df['State'].isin(state)]
     currDF.dropna(subset=["Metro"], inplace=True)
     metros = currDF.Metro.unique()
     metros = sorted(metros)
@@ -78,30 +89,112 @@ def metro_cb(dropdown_value):
     [Input('state-choice', 'value'),
     Input('metro-choice', 'value')])
 def zip_cb(state, metro):
-    currDF = df[(df['State'] == state) & (df['Metro'] == metro)]
+    currDF = df[(df['State'].isin(state)) & (df['Metro'].isin(metro))]
     currDF.dropna(subset=["Metro"], inplace=True)
     zips = currDF.RegionName.unique()
     zips = sorted(zips)
     return [{'label': z, 'value': z} for z in zips]
 
-
+# show or hide datatable
+@app.callback(
+    Output('dt-container', 'style'),
+    [Input('showTable','values')])
+def state_cb(doShowTable):
+    if "Show" in doShowTable:
+        return {'display': 'block'}
+    else:
+        return {'display': 'none'}
 # Create Graph
 @app.callback(
     Output('graph', 'figure'),
     [Input('state-choice', 'value'),
     Input('metro-choice', 'value'),
     Input('zip-choice', 'value')])
-def update_figure(state, metro, zip):
-    currDF = df[df['State']== state]
-    dfGroup = currDF.groupby('Metro', as_index = False)['2018-01'].mean()
-    print(dfGroup)
+def update_figure(state, metro, zipcode):
+    if metro:
+        currDF = df[(df['State'].isin(state)) & (df['Metro'].isin(metro))]
+        currDF.set_index('RegionName', inplace=True)
+        currDF.drop(currDF.columns[0:6], axis=1, inplace=True)
+        tCurrDF = currDF.transpose()
+        myData = []
+        for c in tCurrDF.columns:
+            trace0 = go.Box(
+                y=tCurrDF[c],
+                name = str(c)
+            )
+            myData.append(trace0)
+        layout = go.Layout(
+            xaxis=dict(
+                title='Zip Codes',
+                type = 'category'
+            ),
+            yaxis=dict(
+                title='Price Per Sq. Foot'
+            ),
+            title = "Price Per Sq. Foot by Zip Code"
+
+        )
+        return {
+            'data':myData,
+            'layout':layout
+        }
+
+
+    if state:
+        currDF = df[df['State'].isin(state)]
+        lastCol = df.columns[-1]
+        dfGroup = currDF.groupby(['Metro', 'State'], as_index = False)[lastCol].mean()
+        states = ', '.join(state)
+        myData = []
+        for s in state:
+            currGroup = dfGroup[dfGroup['State'] == s]
+            trace0 = go.Bar(
+                x=currGroup['Metro'],
+                y=currGroup[lastCol],
+                name = s
+            )
+            myData.append(trace0)
+
+        layout = go.Layout(
+            xaxis=dict(
+                title='Metro Area',
+                type = 'category'
+            ),
+            yaxis=dict(
+                title='Price Per Sq. Foot'
+            ),
+            title = "Price Per Sq. Foot by Metropolitan Area for " + states,
+            barmode= "group"
+
+        )
+        return {
+            'data':myData,
+            'layout':layout
+        }
+
+    lastCol = df.columns[-1]
+    dfGroup = df.groupby('State', as_index = False)[lastCol].mean()
+    layout = go.Layout(
+        xaxis=dict(
+            title='State',
+            type = 'category'
+        ),
+        yaxis=dict(
+            title='Price Per Sq. Foot'
+        ),
+        title = "Price Per Sq. Foot by State"
+
+    )
     return {
         'data': [go.Bar(
-            x=dfGroup['Metro'],
-            y=dfGroup['2018-01'],
+            x=dfGroup['State'],
+            y=dfGroup[lastCol],
 
-        )]
+        )],
+        'layout':layout
     }
+
+
 
 if __name__ == '__main__':
     app.run_server(debug=True)
