@@ -5,13 +5,20 @@ import dash_core_components as dcc
 import dash_html_components as html
 import dash_table_experiments as dt
 import pandas as pd
+import numpy as np
 import plotly.graph_objs as go
 
 
 app = dash.Dash()
 #df= pd.read_csv('http://files.zillowstatic.com/research/public/Zip/Zip_MedianValuePerSqft_AllHomes.csv')
 
-df= pd.read_csv('Zip_MedianValuePerSqft_AllHomes.csv')
+df= pd.read_csv('Zip_MedianValuePerSqft_AllHomes.csv', dtype={'RegionName':str})
+dtype_dic= {'ZIP': str,
+            'LAT' : np.float64,
+            'LNG': np.float64}
+zipLatLong = pd.read_csv("ZipLatLong.csv", dtype = dtype_dic)
+zipLatLong.rename(columns={'ZIP': 'RegionName'}, inplace=True)
+df = pd.merge(df, zipLatLong, on='RegionName', how='left')
 
 states = df.State.unique()
 states = sorted(states)
