@@ -52,7 +52,11 @@ app.layout = html.Div(children=[
     ]),
 
 
-    dcc.Graph(id='graph')
+    dcc.Graph(id='graph'),
+    html.Div(id='timeSeries-container', children=[
+        dcc.Graph(id='timeSeries')
+    ])
+
 ])
 
 # update table on change of all dropdowns
@@ -104,6 +108,17 @@ def state_cb(doShowTable):
         return {'display': 'block'}
     else:
         return {'display': 'none'}
+
+# show or hide timeSeries
+@app.callback(
+    Output('timeSeries-container', 'style'),
+    [Input('zip-choice','value')])
+def state_cb(zipChoice):
+    if zipChoice:
+        return {'display': 'block'}
+    else:
+        return {'display': 'none'}
+
 # Create Graph
 @app.callback(
     Output('graph', 'figure'),
@@ -112,17 +127,35 @@ def state_cb(doShowTable):
     Input('zip-choice', 'value')])
 def update_figure(state, metro, zipcode):
     if metro:
-        currDF = df[(df['State'].isin(state)) & (df['Metro'].isin(metro))]
-        currDF.set_index('RegionName', inplace=True)
-        currDF.drop(currDF.columns[0:6], axis=1, inplace=True)
-        tCurrDF = currDF.transpose()
+        # currDF = df[(df['State'].isin(state)) & (df['Metro'].isin(metro))]
+        # currDF.set_index('RegionName', inplace=True)
+        # currDF.drop(currDF.columns[0:6], axis=1, inplace=True)
+        # tCurrDF = currDF.transpose()
+        # myData = []
+        # for c in tCurrDF.columns:
+        #     trace0 = go.Box(
+        #         y=tCurrDF[c],
+        #         name = str(c)
+        #     )
+        #     myData.append(trace0)
+        currDF = df[(df['Metro'].isin(metro)) & (df['State'].isin(state))]
+        lastCol = df.columns[-1]
+        dfGroup = currDF.groupby(['RegionName', 'Metro', 'City'], as_index = False)[lastCol].mean()
+        dfGroup.set_index('RegionName', inplace=True)
+        print (dfGroup.index.values)
+        print (dfGroup)
+        metros = ', '.join(metro)
         myData = []
-        for c in tCurrDF.columns:
-            trace0 = go.Box(
-                y=tCurrDF[c],
-                name = str(c)
+        for m in metro:
+            currGroup = dfGroup[dfGroup['Metro'] == m]
+            trace0 = go.Bar(
+                x=currGroup.index.values,
+                y=currGroup[lastCol],
+                name = m,
+                text = currGroup['City']
             )
             myData.append(trace0)
+
         layout = go.Layout(
             xaxis=dict(
                 title='Zip Codes',
@@ -131,8 +164,8 @@ def update_figure(state, metro, zipcode):
             yaxis=dict(
                 title='Price Per Sq. Foot'
             ),
-            title = "Price Per Sq. Foot by Zip Code"
-
+            title = "Price Per Sq. Foot by Zip Code for " + metros,
+            barmode='group'
         )
         return {
             'data':myData,
@@ -193,7 +226,40 @@ def update_figure(state, metro, zipcode):
         )],
         'layout':layout
     }
+@app.callback(
+    Output('timeSeries', 'figure'),
+    [Input('zip-choice', 'value')])
+def update_timeSeries(zipcode):
+    currDF = df[(df['RegionName'].isin(zipcode)) ]
+    currDF.set_index('RegionName', inplace=True)
+    currDF.drop(currDF.columns[0:6], axis=1, inplace=True)
+    tCurrDF = currDF.transpose()
+    zips = ', '.join(str(x) for x in zipcode)
+    # tCurrDF.set_index('RegionName', inplace=True)
+    print(tCurrDF)
+    myData = []
+    for c in tCurrDF.columns:
+        trace0 = go.Scatter(
+            x=tCurrDF.index.values,
+            y=tCurrDF[c],
+            name = str(c)
+        )
+        myData.append(trace0)
+    layout = go.Layout(
+        xaxis=dict(
+            title='Year-Month',
+            type = 'category'
+        ),
+        yaxis=dict(
+            title='Price Per Sq. Foot'
+        ),
+        title = "Price Per Sq. Foot for " + zips
 
+    )
+    return {
+        'data':myData,
+        'layout':layout
+    }
 
 
 if __name__ == '__main__':
