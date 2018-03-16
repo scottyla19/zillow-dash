@@ -19,9 +19,94 @@ dtype_dic= {'ZIP': str,
 zipLatLong = pd.read_csv("ZipLatLong.csv", dtype = dtype_dic)
 zipLatLong.rename(columns={'ZIP': 'RegionName'}, inplace=True)
 df = pd.merge(df, zipLatLong, on='RegionName', how='left')
-
+lastCol = df.columns[-3]
 states = df.State.unique()
 states = sorted(states)
+
+
+colors = ["rgb(0,116,217)","rgb(255,65,54)","rgb(133,20,75)","rgb(255,133,27)","lightgrey"]
+mapGroup = df.groupby(['Metro', 'State','RegionName', 'LNG', 'LAT'], as_index = False)[lastCol].mean()
+mapGroup.round({lastCol: 2})
+mapGroup['text'] = mapGroup['Metro'] + " - " + mapGroup['RegionName'].astype(str) + ' - $' + mapGroup[lastCol].astype(str)
+scl = [ [0,"rgb(34, 0, 102)"],[0.35,"rgb(17, 51, 204)"],[0.5,"rgb(51, 221, 0)"],\
+    [0.6,"rgb(255, 218, 33)"],[0.7,"rgb(255, 102, 34)"],[1,"rgb(209, 0, 0)"] ]
+
+data = [ dict(
+        type = 'scattergeo',
+        locationmode = 'USA-states',
+        lon = mapGroup['LNG'],
+        lat = mapGroup['LAT'],
+        text = mapGroup['text'],
+        mode = 'markers',
+        sizemode = 'area',
+        marker = dict(
+            size =15,
+            opacity = 0.5,
+            reversescale = False,
+            autocolorscale = False,
+            symbol = 'circle',
+            colorscale = scl,
+            cmin = 0,
+            color = mapGroup[lastCol],
+            cmax = mapGroup[lastCol].quantile(.9),
+            colorbar=dict(
+                title="Median Price Per Sq. Foot as of " + lastCol
+            )
+        ))]
+
+layout = dict(
+        title = 'Median Price Per Square Foot by Zip Code',
+        colorbar = True,
+        # autosize=False,
+        width=1500,
+        # height=500,
+        geo = dict(
+            scope='usa',
+            projection=dict( type='albers usa' ),
+            showland = True,
+            showcoastlines = True,
+            showLakes = True,
+            coastlinewidth = 2,
+            landcolor = "rgb(250, 250, 250)",
+            subunitcolor = "rgb(217, 217, 217)",
+            countrycolor = "rgb(217, 217, 217)",
+            countrywidth = 2,
+            subunitwidth = 2
+        ),
+    )
+
+fig = dict( data=data, layout=layout )
+# scale = 500
+#
+#
+# mapData = go.Scattergeo(
+#         locationmode = 'USA-states',
+#         lon = mapGroup['LNG'],
+#         lat = mapGroup['LAT'],
+#         text = mapGroup['Metro'],
+#         marker = dict(
+#             size = mapGroup[lastCol]/scale,
+#             # color = colors[i],
+#             line = dict(width=0.5, color='rgb(40,40,40)'),
+#             sizemode = 'area'
+#         )
+#     )
+#
+# mapLayout = go.Layout(
+#     title = '2014 US city populations<br>(Click legend to toggle traces)',
+#     showlegend = True,
+#     geo = dict(
+#         scope='usa',
+#         projection=dict( type='albers usa' ),
+#         showland = True,
+#         landcolor = 'rgb(217, 217, 217)',
+#         subunitwidth=1,
+#         countrywidth=1,
+#         subunitcolor="rgb(255, 255, 255)",
+#         countrycolor="rgb(255, 255, 255)"
+#     )
+#
+# )
 
 app.layout = html.Div(children=[
     html.H1(children='Zillow Housing Analysis'),
@@ -47,7 +132,7 @@ app.layout = html.Div(children=[
         options=[
             {'label': 'Show Table', 'value': 'Show'},
         ],
-        values=['Show']
+        values=['No']
     ),
     html.Div(id='dt-container', children=[
         dt.DataTable(
@@ -58,7 +143,7 @@ app.layout = html.Div(children=[
         )
     ]),
 
-
+    dcc.Graph(id='map',figure=fig),
     dcc.Graph(id='graph'),
     html.Div(id='timeSeries-container', children=[
         dcc.Graph(id='timeSeries')
@@ -86,7 +171,7 @@ def state_cb(state, metro, zipcode):
 # update metro dropdown on state dropdown choice
 @app.callback(
     Output('metro-choice', 'options'),
-    [dash.dependencies.Input('state-choice', 'value')])
+    [Input('state-choice', 'value')])
 def metro_cb(state):
     currDF = df[df['State'].isin(state)]
     currDF.dropna(subset=["Metro"], inplace=True)
@@ -126,6 +211,7 @@ def state_cb(zipChoice):
     else:
         return {'display': 'none'}
 
+
 # Create Graph
 @app.callback(
     Output('graph', 'figure'),
@@ -146,11 +232,10 @@ def update_figure(state, metro, zipcode):
         #     )
         #     myData.append(trace0)
         currDF = df[(df['Metro'].isin(metro)) & (df['State'].isin(state))]
-        lastCol = df.columns[-1]
+
         dfGroup = currDF.groupby(['RegionName', 'Metro', 'City'], as_index = False)[lastCol].mean()
         dfGroup.set_index('RegionName', inplace=True)
-        print (dfGroup.index.values)
-        print (dfGroup)
+
         metros = ', '.join(metro)
         myData = []
         for m in metro:
@@ -182,7 +267,7 @@ def update_figure(state, metro, zipcode):
 
     if state:
         currDF = df[df['State'].isin(state)]
-        lastCol = df.columns[-1]
+
         dfGroup = currDF.groupby(['Metro', 'State'], as_index = False)[lastCol].mean()
         states = ', '.join(state)
         myData = []
@@ -212,7 +297,7 @@ def update_figure(state, metro, zipcode):
             'layout':layout
         }
 
-    lastCol = df.columns[-1]
+
     dfGroup = df.groupby('State', as_index = False)[lastCol].mean()
     layout = go.Layout(
         xaxis=dict(
@@ -240,10 +325,10 @@ def update_timeSeries(zipcode):
     currDF = df[(df['RegionName'].isin(zipcode)) ]
     currDF.set_index('RegionName', inplace=True)
     currDF.drop(currDF.columns[0:6], axis=1, inplace=True)
+    currDF.drop(currDF.columns[-2:], axis=1, inplace=True)
     tCurrDF = currDF.transpose()
+
     zips = ', '.join(str(x) for x in zipcode)
-    # tCurrDF.set_index('RegionName', inplace=True)
-    print(tCurrDF)
     myData = []
     for c in tCurrDF.columns:
         trace0 = go.Scatter(
