@@ -7,9 +7,13 @@ import dash_table_experiments as dt
 import pandas as pd
 import numpy as np
 import plotly.graph_objs as go
+from flask import send_from_directory
+import os
 
-
-app = dash.Dash()
+app = dash.Dash(__name__, static_folder='static')
+app.title = "Zip Code Analysis"
+app.css.config.serve_locally = True
+app.scripts.config.serve_locally = True
 #df= pd.read_csv('http://files.zillowstatic.com/research/public/Zip/Zip_MedianValuePerSqft_AllHomes.csv')
 
 df= pd.read_csv('Zip_MedianValuePerSqft_AllHomes.csv', dtype={'RegionName':str})
@@ -57,8 +61,8 @@ data = [ dict(
 layout = dict(
         title = 'Median Price Per Square Foot by Zip Code',
         colorbar = True,
-        # autosize=False,
-        width=1500,
+        autosize=True,
+        margin={'l': 40, 'b': 40, 't': 40, 'r': 100},
         # height=500,
         geo = dict(
             scope='usa',
@@ -76,79 +80,70 @@ layout = dict(
     )
 
 fig = dict( data=data, layout=layout )
-# scale = 500
-#
-#
-# mapData = go.Scattergeo(
-#         locationmode = 'USA-states',
-#         lon = mapGroup['LNG'],
-#         lat = mapGroup['LAT'],
-#         text = mapGroup['Metro'],
-#         marker = dict(
-#             size = mapGroup[lastCol]/scale,
-#             # color = colors[i],
-#             line = dict(width=0.5, color='rgb(40,40,40)'),
-#             sizemode = 'area'
-#         )
-#     )
-#
-# mapLayout = go.Layout(
-#     title = '2014 US city populations<br>(Click legend to toggle traces)',
-#     showlegend = True,
-#     geo = dict(
-#         scope='usa',
-#         projection=dict( type='albers usa' ),
-#         showland = True,
-#         landcolor = 'rgb(217, 217, 217)',
-#         subunitwidth=1,
-#         countrywidth=1,
-#         subunitcolor="rgb(255, 255, 255)",
-#         countrycolor="rgb(255, 255, 255)"
-#     )
-#
-# )
 
-app.layout = html.Div(children=[
-    html.H1(children='Zillow Housing Analysis'),
+app.layout = html.Div([
+html.Div([ html.Meta(name='viewport', content='width=device-width, initial-scale=1.0'),
+html.Link(
+    rel='stylesheet',
+    href='/static/stylesheet.css'
+)
+]),
+html.Div(children=[
+    html.Div([
+        html.H1(children='Zillow Housing Analysis'),
+    ], className = 'header'),
+    html.Div([
+        dcc.Dropdown(
+            id='state-choice',
+            options=[{'label': i, 'value': i} for i in states],
+            placeholder='Choose your state',
+            multi=True,
+            className='sidebar-select'
+        ),
+        html.Div(id='metro-container',children=[
+            dcc.Dropdown(
+                id='metro-choice',
+                placeholder='Choose your metro area',
+                multi=True,
+                className='sidebar-select',
 
-    dcc.Dropdown(
-        id='state-choice',
-        options=[{'label': i, 'value': i} for i in states],
-        placeholder='Choose your state',
-        multi=True
-    ),
-    dcc.Dropdown(
-        id='metro-choice',
-        placeholder='Choose your metro area',
-        multi=True
-    ),
-    dcc.Dropdown(
-        id='zip-choice',
-        placeholder='Choose your zipcode',
-        multi=True
-    ),
-    dcc.Checklist(
-        id='showTable',
-        options=[
-            {'label': 'Show Table', 'value': 'Show'},
-        ],
-        values=['No']
-    ),
-    html.Div(id='dt-container', children=[
-        dt.DataTable(
-            rows=[{}],
-            id='datatable',
-            filterable=True,
-            sortable=True
-        )
-    ]),
+            )
+        ], style={'display':'none'}),
+        html.Div(id='zip-container',children=[
+            dcc.Dropdown(
+                id='zip-choice',
+                placeholder='Choose your zipcode',
+                multi=True,
+                className='sidebar-select'
+            )
+        ], style={'display':'none'})
+    ], className='sidebar'),
+    # dcc.Checklist(
+    #     id='showTable',
+    #     options=[
+    #         {'label': 'Show Table', 'value': 'Show'},
+    #     ],
+    #     values=['No']
+    # ),
+    html.Div([
+        html.Div(id='dt-container', children=[
+            dt.DataTable(
+                rows=[{}],
+                id='datatable',
+                filterable=True,
+                sortable=True
+            )
+        ]),
 
-    dcc.Graph(id='map',figure=fig),
-    dcc.Graph(id='graph'),
-    html.Div(id='timeSeries-container', children=[
-        dcc.Graph(id='timeSeries')
-    ])
+        dcc.Graph(id='map',figure=fig),
+        dcc.Graph(id='graph'),
+        html.Div(id='timeSeries-container', children=[
+            dcc.Graph(id='timeSeries')
+        ])
+    ], className='main-content')
 
+
+], className='container')
 ])
 
 # update table on change of all dropdowns
@@ -191,12 +186,22 @@ def zip_cb(state, metro):
     zips = sorted(zips)
     return [{'label': z, 'value': z} for z in zips]
 
-# show or hide datatable
+#show metro choice
 @app.callback(
-    Output('dt-container', 'style'),
-    [Input('showTable','values')])
-def state_cb(doShowTable):
-    if "Show" in doShowTable:
+    Output('metro-container', 'style'),
+    [Input('state-choice','value')])
+def state_cb(state):
+    if state:
+        return {'display': 'block'}
+    else:
+        return {'display': 'none'}
+
+#show zip choice
+@app.callback(
+    Output('zip-container', 'style'),
+    [Input('metro-choice','value')])
+def state_cb(metro):
+    if metro:
         return {'display': 'block'}
     else:
         return {'display': 'none'}
@@ -257,6 +262,8 @@ def update_figure(state, metro, zipcode):
                 title='Price Per Sq. Foot'
             ),
             title = "Price Per Sq. Foot by Zip Code for " + metros,
+            autosize = True,
+            margin={'l': 40, 'b': 40, 't': 40, 'r': 100},
             barmode='group'
         )
         return {
@@ -289,6 +296,8 @@ def update_figure(state, metro, zipcode):
                 title='Price Per Sq. Foot'
             ),
             title = "Price Per Sq. Foot by Metropolitan Area for " + states,
+            autosize = True,
+            margin={'l': 40, 'b': 40, 't': 40, 'r': 100},
             barmode= "group"
 
         )
@@ -307,7 +316,9 @@ def update_figure(state, metro, zipcode):
         yaxis=dict(
             title='Price Per Sq. Foot'
         ),
-        title = "Price Per Sq. Foot by State"
+        title = "Price Per Sq. Foot by State",
+        autosize = True,
+         margin={'l': 40, 'b': 40, 't': 40, 'r': 100}
 
     )
     return {
@@ -345,7 +356,9 @@ def update_timeSeries(zipcode):
         yaxis=dict(
             title='Price Per Sq. Foot'
         ),
-        title = "Price Per Sq. Foot for " + zips
+        title = "Price Per Sq. Foot for " + zips,
+        autosize = True,
+        margin={'l': 40, 'b': 40, 't': 40, 'r': 100}
 
     )
     return {
@@ -353,6 +366,10 @@ def update_timeSeries(zipcode):
         'layout':layout
     }
 
+# @app.server.route('/static/<path>')
+# def static_file(path):
+#     static_folder = os.path.join(os.getcwd(), 'static')
+#     return send_from_directory(static_folder, path)
 
 if __name__ == '__main__':
     app.run_server(debug=True)

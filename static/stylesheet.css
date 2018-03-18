@@ -1,0 +1,30 @@
+h1{
+  color: blue;
+}
+.Select-control{
+  max-width: 250px;
+}
+/* */
+
+
+@media only screen  and (min-width : 1224px) {
+/* Styles */
+  .container{
+    display: grid;
+    grid-template-columns: 250px auto;
+    grid-template-rows: auto;
+    grid-column-gap: 10px;
+    grid-template-areas:
+      "header header"
+      "sidebar main-content";
+  }
+  .header{
+    grid-area: header;
+  }
+  .sidebar{
+    grid-area: sidebar;
+  }
+  .main-content{
+    grid-area: main-content;
+  }
+}
