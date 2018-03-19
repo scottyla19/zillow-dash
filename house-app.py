@@ -11,6 +11,7 @@ from flask import send_from_directory
 import os
 
 app = dash.Dash(__name__, static_folder='static')
+server = app.server
 app.title = "Zip Code Analysis"
 app.css.config.serve_locally = True
 app.scripts.config.serve_locally = True
