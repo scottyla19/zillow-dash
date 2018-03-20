@@ -1,3 +1,4 @@
+setuptools==38.5.1
 certifi==2018.1.18
 chardet==3.0.4
 click==6.7
@@ -25,4 +26,3 @@ six==1.11.0
 traitlets==4.3.2
 urllib3==1.22
 Werkzeug==0.14.1
-setuptools==38.5.1
