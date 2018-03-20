@@ -128,6 +128,7 @@ html.Div(children=[
     # ),
     html.Div([
         html.Div(id='dt-container', children=[
+        # dcc.Graph(id='datatable')
             dt.DataTable(
                 rows=[{}],
                 id='datatable',
@@ -154,15 +155,31 @@ html.Div(children=[
     Input('metro-choice', 'value'),
     Input('zip-choice', 'value')])
 def state_cb(state, metro, zipcode):
+
+
+
+    currDF = df
     if zipcode:
         currDF = df[(df['State'].isin(state)) & (df['Metro'].isin(metro)) & (df['RegionName'].isin(zipcode))]
-        return currDF.to_dict('records')
+        # return currDF.to_dict('records')
     elif metro:
         currDF = df[(df['State'].isin(state)) & (df['Metro'].isin(metro))]
-        return currDF.to_dict('records')
+        # return currDF.to_dict('records')
     else:
         currDF = df[df['State'].isin(state)]
-        return currDF.to_dict('records')
+        # return currDF.to_dict('records')
+    # colList = [currDF[x] for x in df.columns ]
+    # print(colList)
+    # trace = go.Table(
+    # header=dict(values=currDF.columns,
+    #             fill = dict(color='#C2D4FF'),
+    #             align = ['center'] * 5),
+    # cells=dict(values=colList,
+    #            fill = dict(color='#F5F8FF'),
+    #            align = ['center'] * 5))
+    # data = [trace]
+    # return{'data': data}
+    return currDF.to_dict('records')
 
 # update metro dropdown on state dropdown choice
 @app.callback(
