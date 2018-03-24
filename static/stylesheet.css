@@ -3,6 +3,7 @@ h1{
 }
 .Select-control{
   max-width: 250px;
+  min-width: 200px;
 }
 /* */
 
@@ -16,13 +17,16 @@ h1{
     grid-column-gap: 10px;
     grid-template-areas:
       "header header"
-      "sidebar main-content";
+      "sidebar sidebar"
+      "main-content main-content";
   }
   .header{
     grid-area: header;
   }
   .sidebar{
     grid-area: sidebar;
+    display:flex;
+    flex-flow: row wrap;
   }
   .main-content{
     grid-area: main-content;
